@@ -109,7 +109,7 @@ def validar_agregar():
         nombre = entry_nombre.get().strip()
         cantidad = int(entry_cantidad.get().strip())
         costo_usd = float(entry_costo_usd.get().strip())
-
+        unidad = entry_unidad.get().strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío.")
 
@@ -118,7 +118,7 @@ def validar_agregar():
     except ValueError as e:
         messagebox.showerror("Error", f"Datos inválidos: {e}")
 
-def editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path):
+def editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path, unidad):
     """Edita un producto existente."""
     if not nombre:
         messagebox.showerror("Error", "Por favor, ingresa todos los campos correctamente.")
@@ -153,11 +153,12 @@ def validar_editar():
         nombre = entry_nombre.get().strip()
         cantidad = int(entry_cantidad.get().strip())
         costo_usd = float(entry_costo_usd.get().strip())
+        unidad = entry_unidad.get().strip()
 
         if not nombre:
             raise ValueError("El nombre no puede estar vacío.")
 
-        editar_producto(1, nombre, cantidad, costo_usd, tasa, imagen_path)
+        editar_producto(1, nombre, cantidad, costo_usd, tasa, imagen_path, unidad)
         cargar_productos(tree)  # Recargar productos en la tabla
         messagebox.showinfo("Éxito", "Producto editado correctamente.")
     except ValueError as e:
@@ -170,28 +171,29 @@ def seleccionar_imagen():
     imagen_path = filedialog.askopenfilename(filetypes=[("Archivos de imagen", "*.jpg;*.jpeg;*.png;*.gif")])
     return imagen_path
 
-def mostrar_ficha_producto(id_producto, root, label_imagen, label_nombre, label_precio_usd, label_precio_bs, label_inventario):
+def mostrar_ficha_producto(id_producto, root, label_imagen, label_nombre, label_precio_usd, label_precio_bs, label_inventario, label_unidad):
     """Muestra la ficha de un producto específico."""
     producto = obtener_producto(id_producto)
     if producto:
-        # Desempaquetar solo los 5 valores que devuelve la consulta
-        nombre, imagen, precio_usd, precio_bs, inventario = producto
+        # Desempaquetar los valores que devuelve la consulta
+        nombre, imagen, precio_usd, precio_bs, inventario, unidad = producto
         
         # Mostrar imagen del producto
         if imagen:
             imagen_producto = Image.open(imagen)
             imagen_producto = imagen_producto.resize((100, 100))
-            imagen_tk = ImageTk.PhotoImage(imagen_producto)
-            label_imagen.configure(image=imagen_tk)
+            imagen_tk = ctk.CTkImage(light_image=imagen_producto, size=(100, 100))
+            label_imagen.configure(image=imagen_tk, text="")
             label_imagen.image = imagen_tk  # Guardar la referencia de la imagen
         else:
             label_imagen.configure(image='', text="No hay imagen")
 
         # Mostrar datos del producto
         label_nombre.configure(text=f"Nombre: {nombre}")
-        label_precio_usd.configure(text=f"Precio (USD): {precio_usd}")
-        label_precio_bs.configure(text=f"Precio (Bs): {precio_bs}")
+        label_precio_usd.configure(text=f"Precio (USD): {precio_usd:.2f}")
+        label_precio_bs.configure(text=f"Precio (Bs): {precio_bs:.2f}")
         label_inventario.configure(text=f"Inventario: {inventario}")
+        label_unidad.configure(text=f"Unidad: {unidad}")
 
         # Actualizar campos de entrada para edición
         entry_nombre.delete(0, 'end')
@@ -200,6 +202,16 @@ def mostrar_ficha_producto(id_producto, root, label_imagen, label_nombre, label_
         entry_cantidad.insert(0, inventario)
         entry_costo_usd.delete(0, 'end')
         entry_costo_usd.insert(0, precio_usd)
+
+# Asegúrate de que la función obtener_producto devuelva todos los campos necesarios
+def obtener_producto(id_producto):
+    """Obtiene los detalles de un producto específico."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT nombre, imagen, precio_usd, precio_bs, inventario, unidad FROM productos WHERE id = ?", (id_producto,))
+    producto = cursor.fetchone()
+    conn.close()
+    return producto
 
 def mostrar_lista_productos(root):
     """Muestra una lista de todos los productos disponibles para editar o seleccionar."""
