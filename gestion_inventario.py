@@ -31,19 +31,6 @@ def obtener_productos():
     finally:
         conn.close()
 
-def obtener_producto(id_producto):
-    """Obtiene los detalles de un producto específico por su ID."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT nombre, imagen, precio_usd, precio_bs, inventario FROM productos WHERE id = ?", (id_producto,))
-        return cursor.fetchone()
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo obtener el producto: {e}")
-        return None
-    finally:
-        conn.close()
-
 def agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path):
     """Agrega un nuevo producto al inventario."""
     if not nombre or not cantidad.isdigit() or not costo_usd.replace('.', '', 1).isdigit():
