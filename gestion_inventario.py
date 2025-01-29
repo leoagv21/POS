@@ -1,5 +1,6 @@
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
+from tkinter import PhotoImage  # Importar PhotoImage desde tkinter
 from PIL import Image, ImageTk
 from db_manager import get_connection
 import os
@@ -31,9 +32,22 @@ def obtener_productos():
     finally:
         conn.close()
 
-def agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path):
+def obtener_producto(id_producto):
+    """Obtiene los detalles de un producto específico por su ID."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT nombre, imagen, precio_usd, precio_bs, inventario FROM productos WHERE id = ?", (id_producto,))
+        return cursor.fetchone()
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo obtener el producto: {e}")
+        return None
+    finally:
+        conn.close()
+
+def agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path, unidad):
     """Agrega un nuevo producto al inventario."""
-    if not nombre or not cantidad.isdigit() or not costo_usd.replace('.', '', 1).isdigit():
+    if not nombre or not unidad:
         messagebox.showerror("Error", "Por favor, ingresa todos los campos correctamente.")
         return
     
@@ -45,13 +59,14 @@ def agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path):
         # Si se seleccionó una imagen, la guardamos en la carpeta 'imagenes'
         imagen_guardada = None
         if imagen_path:
+            os.makedirs("imagenes", exist_ok=True)
             imagen_guardada = os.path.join("imagenes", os.path.basename(imagen_path))
             Image.open(imagen_path).save(imagen_guardada)  # Guardamos la imagen
 
         cursor.execute("""
-            INSERT INTO productos (nombre, imagen, precio_usd, precio_bs, inventario, tasa_cambio)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (nombre, imagen_guardada, float(costo_usd), costo_bs, int(cantidad), tasa))
+            INSERT INTO productos (nombre, imagen, precio_usd, precio_bs, inventario, tasa_cambio, unidad)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (nombre, imagen_guardada, float(costo_usd), costo_bs, int(cantidad), tasa, unidad))
         conn.commit()
         messagebox.showinfo("Éxito", "Producto agregado correctamente.")
     except Exception as e:
@@ -59,9 +74,9 @@ def agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path):
     finally:
         conn.close()
 
-def editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path):
+def editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path, unidad):
     """Edita un producto existente."""
-    if not nombre or not cantidad.isdigit() or not costo_usd.replace('.', '', 1).isdigit():
+    if not nombre or not unidad:
         messagebox.showerror("Error", "Por favor, ingresa todos los campos correctamente.")
         return
     
@@ -73,6 +88,51 @@ def editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path)
         # Si se seleccionó una imagen, la guardamos en la carpeta 'imagenes'
         imagen_guardada = None
         if imagen_path:
+            os.makedirs("imagenes", exist_ok=True)
+            imagen_guardada = os.path.join("imagenes", os.path.basename(imagen_path))
+            Image.open(imagen_path).save(imagen_guardada)  # Guardamos la imagen
+
+        cursor.execute("""
+            UPDATE productos
+            SET nombre = ?, inventario = ?, precio_usd = ?, precio_bs = ?, imagen = ?, tasa_cambio = ?, unidad = ?
+            WHERE id = ?
+        """, (nombre, int(cantidad), float(costo_usd), costo_bs, imagen_guardada, tasa, unidad, id_producto))
+        conn.commit()
+        messagebox.showinfo("Éxito", "Producto actualizado correctamente.")
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo actualizar el producto: {e}")
+    finally:
+        conn.close()
+
+def validar_agregar():
+    try:
+        nombre = entry_nombre.get().strip()
+        cantidad = int(entry_cantidad.get().strip())
+        costo_usd = float(entry_costo_usd.get().strip())
+
+        if not nombre:
+            raise ValueError("El nombre no puede estar vacío.")
+
+        agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path)
+        messagebox.showinfo("Éxito", "Producto agregado correctamente.")
+    except ValueError as e:
+        messagebox.showerror("Error", f"Datos inválidos: {e}")
+
+def editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path):
+    """Edita un producto existente."""
+    if not nombre:
+        messagebox.showerror("Error", "Por favor, ingresa todos los campos correctamente.")
+        return
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        costo_bs = float(costo_usd) * tasa
+
+        # Si se seleccionó una imagen, la guardamos en la carpeta 'imagenes'
+        imagen_guardada = None
+        if imagen_path:
+            os.makedirs("imagenes", exist_ok=True)
             imagen_guardada = os.path.join("imagenes", os.path.basename(imagen_path))
             Image.open(imagen_path).save(imagen_guardada)  # Guardamos la imagen
 
@@ -88,12 +148,29 @@ def editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path)
     finally:
         conn.close()
 
+def validar_editar():
+    try:
+        nombre = entry_nombre.get().strip()
+        cantidad = int(entry_cantidad.get().strip())
+        costo_usd = float(entry_costo_usd.get().strip())
+
+        if not nombre:
+            raise ValueError("El nombre no puede estar vacío.")
+
+        editar_producto(1, nombre, cantidad, costo_usd, tasa, imagen_path)
+        cargar_productos(tree)  # Recargar productos en la tabla
+        messagebox.showinfo("Éxito", "Producto editado correctamente.")
+    except ValueError as e:
+        messagebox.showerror("Error", f"Datos inválidos: {e}")
+
+# ...existing code...
+
 def seleccionar_imagen():
     """Permite seleccionar una imagen para el producto."""
     imagen_path = filedialog.askopenfilename(filetypes=[("Archivos de imagen", "*.jpg;*.jpeg;*.png;*.gif")])
     return imagen_path
 
-def mostrar_ficha_producto(id_producto, root):
+def mostrar_ficha_producto(id_producto, root, label_imagen, label_nombre, label_precio_usd, label_precio_bs, label_inventario):
     """Muestra la ficha de un producto específico."""
     producto = obtener_producto(id_producto)
     if producto:
@@ -101,18 +178,28 @@ def mostrar_ficha_producto(id_producto, root):
         nombre, imagen, precio_usd, precio_bs, inventario = producto
         
         # Mostrar imagen del producto
-        imagen_producto = Image.open(imagen) if imagen else None
-        imagen_producto = imagen_producto.resize((100, 100)) if imagen_producto else None
-        imagen_tk = ImageTk.PhotoImage(imagen_producto) if imagen_producto else None
-        label_imagen = ctk.CTkLabel(root, image=imagen_tk, text="No hay imagen")
-        label_imagen.image = imagen_tk  # Guardar la referencia de la imagen
-        label_imagen.pack(pady=10)
+        if imagen:
+            imagen_producto = Image.open(imagen)
+            imagen_producto = imagen_producto.resize((100, 100))
+            imagen_tk = ImageTk.PhotoImage(imagen_producto)
+            label_imagen.configure(image=imagen_tk)
+            label_imagen.image = imagen_tk  # Guardar la referencia de la imagen
+        else:
+            label_imagen.configure(image='', text="No hay imagen")
 
         # Mostrar datos del producto
-        ctk.CTkLabel(root, text=f"Nombre: {nombre}").pack(pady=5)
-        ctk.CTkLabel(root, text=f"Precio (USD): {precio_usd}").pack(pady=5)
-        ctk.CTkLabel(root, text=f"Precio (Bs): {precio_bs}").pack(pady=5)
-        ctk.CTkLabel(root, text=f"Inventario: {inventario}").pack(pady=5)
+        label_nombre.configure(text=f"Nombre: {nombre}")
+        label_precio_usd.configure(text=f"Precio (USD): {precio_usd}")
+        label_precio_bs.configure(text=f"Precio (Bs): {precio_bs}")
+        label_inventario.configure(text=f"Inventario: {inventario}")
+
+        # Actualizar campos de entrada para edición
+        entry_nombre.delete(0, 'end')
+        entry_nombre.insert(0, nombre)
+        entry_cantidad.delete(0, 'end')
+        entry_cantidad.insert(0, inventario)
+        entry_costo_usd.delete(0, 'end')
+        entry_costo_usd.insert(0, precio_usd)
 
 def mostrar_lista_productos(root):
     """Muestra una lista de todos los productos disponibles para editar o seleccionar."""
@@ -121,73 +208,201 @@ def mostrar_lista_productos(root):
         id_producto, nombre, precio_usd, precio_bs, inventario = producto
         button_producto = ctk.CTkButton(
             root, text=f"{nombre} - {precio_usd} USD", 
-            command=lambda id=id_producto: mostrar_ficha_producto(id, root)
+            command=lambda id_producto=id_producto: mostrar_ficha_producto(id_producto, root)
         )
         button_producto.pack(pady=5)
 
+def cargar_productos(tree):
+    """Carga los productos en la tabla Treeview."""
+    for row in tree.get_children():
+        tree.delete(row)
+    
+    productos = obtener_productos()
+    for producto in productos:
+        tree.insert("", "end", values=producto)
+
+def eliminar_producto(id_producto):
+    """Elimina un producto del inventario."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM productos WHERE id = ?", (id_producto,))
+        conn.commit()
+        messagebox.showinfo("Éxito", "Producto eliminado correctamente.")
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo eliminar el producto: {e}")
+    finally:
+        conn.close()
+
 def interfaz_inventario():
-    """Interfaz para agregar, editar y mostrar productos en inventario."""
+    """Interfaz mejorada para la gestión de inventario."""
+
+    global entry_nombre, entry_cantidad, entry_costo_usd, entry_unidad, tasa, imagen_path, tree
+
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
     root = ctk.CTk()
     root.title("Gestión de Inventario")
-    root.geometry("800x600")
+    root.state('zoomed')  # Maximizar la ventana al iniciar
+
+    # Establecer el icono del programa
+    icon_path = os.path.join(os.path.dirname(__file__), 'icono.png')
+    icon_image = PhotoImage(file=icon_path)
+    root.iconphoto(True, icon_image)  # Asegúrate de que el archivo icono.png esté en el mismo directorio
+
+    # Configurar el grid
+    root.grid_rowconfigure(1, weight=1)
+    root.grid_columnconfigure(1, weight=1)
+
+    # Contenedor principal
+    frame_main = ctk.CTkFrame(root)
+    frame_main.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+    frame_main.grid_rowconfigure(1, weight=1)
+    frame_main.grid_columnconfigure(1, weight=1)
 
     # Título principal
-    ctk.CTkLabel(root, text="Gestión de Inventario", font=("Arial", 20, "bold")).pack(pady=10)
+    ctk.CTkLabel(frame_main, text="Gestión de Inventario", font=("Arial", 20, "bold")).grid(row=0, column=0, columnspan=4, pady=10)
 
-    # Mostrar lista de productos
-    mostrar_lista_productos(root)
+    # Frame para lista de productos
+    frame_lista = ctk.CTkFrame(frame_main)
+    frame_lista.grid(row=1, column=1, columnspan=3, pady=10, sticky="nsew")
+    frame_lista.grid_rowconfigure(0, weight=1)
+    frame_lista.grid_columnconfigure(0, weight=1)
 
-    # Entrada para agregar/editar producto
-    frame_input = ctk.CTkFrame(root)
-    frame_input.pack(pady=10, padx=20, fill="x")
+    # Tabla de productos
+    columnas = ("ID", "Nombre", "Precio (USD)", "Precio (Bs)", "Inventario", "Unidad")
+    tree = ttk.Treeview(frame_lista, columns=columnas, show="headings", height=8)
+    for col in columnas:
+        tree.heading(col, text=col)
+        tree.column(col, width=100, anchor="center")
+    tree.grid(row=0, column=0, sticky="nsew")
 
-    ctk.CTkLabel(frame_input, text="Nombre del Producto:").pack(side="left", padx=10)
-    entry_nombre = ctk.CTkEntry(frame_input)
-    entry_nombre.pack(side="left", padx=10, fill="x", expand=True)
+    # Añadir scrollbar a la tabla
+    scrollbar = ttk.Scrollbar(frame_lista, orient="vertical", command=tree.yview)
+    tree.configure(yscroll=scrollbar.set)
+    scrollbar.grid(row=0, column=1, sticky="ns")
 
-    ctk.CTkLabel(frame_input, text="Cantidad:").pack(side="left", padx=10)
-    entry_cantidad = ctk.CTkEntry(frame_input)
-    entry_cantidad.pack(side="left", padx=10, fill="x", expand=True)
+    # Cargar productos en la tabla
+    cargar_productos(tree)
 
-    ctk.CTkLabel(frame_input, text="Costo (USD):").pack(side="left", padx=10)
-    entry_costo_usd = ctk.CTkEntry(frame_input)
-    entry_costo_usd.pack(side="left", padx=10, fill="x", expand=True)
+    # Frame de entrada
+    frame_input = ctk.CTkFrame(frame_main)
+    frame_input.grid(row=2, column=1, columnspan=3, pady=10, padx=20, sticky="ew")
+
+    ctk.CTkLabel(frame_input, text="Nombre:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+    entry_nombre = ctk.CTkEntry(frame_input, width=150)
+    entry_nombre.grid(row=0, column=1, padx=5, pady=5)
+
+    ctk.CTkLabel(frame_input, text="Cantidad:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+    entry_cantidad = ctk.CTkEntry(frame_input, width=80)
+    entry_cantidad.grid(row=0, column=3, padx=5, pady=5)
+
+    ctk.CTkLabel(frame_input, text="Costo (USD):").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+    entry_costo_usd = ctk.CTkEntry(frame_input, width=80)
+    entry_costo_usd.grid(row=1, column=1, padx=5, pady=5)
+
+    ctk.CTkLabel(frame_input, text="Unidad:").grid(row=1, column=2, padx=5, pady=5, sticky="e")
+    entry_unidad = ctk.CTkEntry(frame_input, width=80)
+    entry_unidad.grid(row=1, column=3, padx=5, pady=5)
 
     # Botón para seleccionar imagen
     imagen_path = None
     def seleccionar_y_guardar_imagen():
-        nonlocal imagen_path
+        global imagen_path
         imagen_path = seleccionar_imagen()
+        if imagen_path:
+            messagebox.showinfo("Imagen seleccionada", f"Imagen cargada: {imagen_path}")
 
-    ctk.CTkButton(
-        frame_input,
-        text="Seleccionar Imagen",
-        command=seleccionar_y_guardar_imagen
-    ).pack(side="left", padx=10)
+    ctk.CTkButton(frame_input, text="Seleccionar Imagen", command=seleccionar_y_guardar_imagen).grid(row=2, column=0, columnspan=4, padx=5, pady=5)
 
     # Obtener tasa de cambio actual
     tasa = obtener_tasa_cambio()
-
     if not tasa:
         messagebox.showerror("Error", "No se pudo obtener la tasa de cambio.")
         return
 
-    # Botón para agregar producto
-    ctk.CTkButton(
-        root,
-        text="Agregar Producto",
-        command=lambda: agregar_producto(entry_nombre.get(), entry_cantidad.get(), entry_costo_usd.get(), tasa, imagen_path)
-    ).pack(pady=10)
+    # Frame para mostrar detalles del producto
+    frame_detalles = ctk.CTkFrame(frame_main)
+    frame_detalles.grid(row=1, column=0, rowspan=2, padx=10, pady=10, sticky="n")
 
-    # Botón para editar producto (por ejemplo, editar el producto con ID 1)
-    ctk.CTkButton(
-        root,
-        text="Editar Producto",
-        command=lambda: editar_producto(1, entry_nombre.get(), entry_cantidad.get(), entry_costo_usd.get(), tasa, imagen_path)
-    ).pack(pady=10)
+    label_imagen = ctk.CTkLabel(frame_detalles, text="No hay imagen", width=100, height=100)
+    label_imagen.pack(pady=10)
+
+    label_nombre = ctk.CTkLabel(frame_detalles, text="Nombre: ")
+    label_nombre.pack(pady=5)
+
+    label_precio_usd = ctk.CTkLabel(frame_detalles, text="Precio (USD): ")
+    label_precio_usd.pack(pady=5)
+
+    label_precio_bs = ctk.CTkLabel(frame_detalles, text="Precio (Bs): ")
+    label_precio_bs.pack(pady=5)
+
+    label_inventario = ctk.CTkLabel(frame_detalles, text="Inventario: ")
+    label_inventario.pack(pady=5)
+
+    label_unidad = ctk.CTkLabel(frame_detalles, text="Unidad: ")
+    label_unidad.pack(pady=5)
+
+    # Función para validar y agregar producto
+    def validar_agregar():
+        try:
+            nombre = entry_nombre.get().strip()
+            cantidad = int(entry_cantidad.get().strip())
+            costo_usd = float(entry_costo_usd.get().strip())
+            unidad = entry_unidad.get().strip()
+
+            if not nombre or not unidad:
+                raise ValueError("El nombre y la unidad no pueden estar vacíos.")
+
+            agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path, unidad)
+            cargar_productos(tree)  # Recargar productos en la tabla
+            messagebox.showinfo("Éxito", "Producto agregado correctamente.")
+        except ValueError as e:
+            messagebox.showerror("Error", f"Datos inválidos: {e}")
+
+    # Botón para agregar producto
+    ctk.CTkButton(frame_main, text="Agregar Producto", command=validar_agregar).grid(row=3, column=1, columnspan=1, pady=10, sticky="ew")
+
+    # Botón para editar producto (se requiere un ID válido)
+    def validar_editar():
+        try:
+            nombre = entry_nombre.get().strip()
+            cantidad = int(entry_cantidad.get().strip())
+            costo_usd = float(entry_costo_usd.get().strip())
+            unidad = entry_unidad.get().strip()
+
+            if not nombre or not unidad:
+                raise ValueError("El nombre y la unidad no pueden estar vacíos.")
+
+            editar_producto(1, nombre, cantidad, costo_usd, tasa, imagen_path, unidad)
+            cargar_productos(tree)  # Recargar productos en la tabla
+            messagebox.showinfo("Éxito", "Producto editado correctamente.")
+        except ValueError as e:
+            messagebox.showerror("Error", f"Datos inválidos: {e}")
+
+    ctk.CTkButton(frame_main, text="Editar Producto", command=validar_editar).grid(row=3, column=2, columnspan=1, pady=10, sticky="ew")
+
+    # Botón para eliminar producto (se requiere un ID válido)
+    def validar_eliminar():
+        selected_item = tree.selection()
+        if selected_item:
+            item = tree.item(selected_item)
+            id_producto = item['values'][0]
+            eliminar_producto(id_producto)
+            cargar_productos(tree)  # Recargar productos en la tabla
+
+    ctk.CTkButton(frame_main, text="Eliminar Producto", command=validar_eliminar).grid(row=3, column=3, columnspan=1, pady=10, sticky="ew")
+
+    # Evento para seleccionar producto en la tabla
+    def on_tree_select(event):
+        selected_item = tree.selection()
+        if selected_item:
+            item = tree.item(selected_item)
+            id_producto = item['values'][0]
+            mostrar_ficha_producto(id_producto, root, label_imagen, label_nombre, label_precio_usd, label_precio_bs, label_inventario, label_unidad)
+
+    tree.bind("<<TreeviewSelect>>", on_tree_select)
 
     root.mainloop()
 
