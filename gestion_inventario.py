@@ -5,6 +5,7 @@ from PIL import Image, ImageTk
 from db_manager import get_connection
 import os
 
+
 def obtener_tasa_cambio():
     """Obtiene la tasa de cambio más reciente."""
     conn = get_connection()
@@ -99,6 +100,12 @@ def validar_editar():
         cantidad = int(entry_cantidad.get().strip())
         costo_usd = float(entry_costo_usd.get().strip())
         unidad = entry_unidad.get().strip()
+    except ValueError as e:
+        messagebox.showerror("Error", f"Datos inválidos: {e}")
+        return
+    except ValueError as e:
+        messagebox.showerror("Error", f"Datos inválidos: {e}")
+        return
 
 
 
@@ -162,6 +169,7 @@ def mostrar_ficha_producto(id_producto, root, label_imagen, label_nombre, label_
         entry_precio_venta_sin_iva.insert(0, precio_venta_sin_iva)
         entry_iva.delete(0, 'end')
         entry_iva.insert(0, iva)
+        
 
 
 def obtener_producto(id_producto):
@@ -208,10 +216,132 @@ def eliminar_producto(id_producto, tree):
     finally:
         conn.close()
 
+def crear_label(frame, text, row, column, padx=5, pady=5, sticky="e"):
+    label = ctk.CTkLabel(frame, text=text)
+    label.grid(row=row, column=column, padx=padx, pady=pady, sticky=sticky)
+    return label
+
+def crear_entry(frame, width, row, column, padx=5, pady=5, sticky="w"):
+    entry = ctk.CTkEntry(frame, width=width)
+    entry.grid(row=row, column=column, padx=padx, pady=pady, sticky=sticky)
+    return entry
+
+def obtener_tasa_cambio():
+    """Obtiene la tasa de cambio más reciente."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT tasa FROM tasa_cambio ORDER BY id DESC LIMIT 1")
+        tasa = cursor.fetchone()
+        return tasa[0] if tasa else None
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo obtener la tasa de cambio: {e}")
+        return None
+    finally:
+        conn.close()
+
+def calcular_precios(event=None):
+    """Calcula los precios automáticamente."""
+    try:
+        cantidad = int(entry_cantidad.get().strip())
+        costo_usd = float(entry_costo_usd.get().strip())
+        iva = float(entry_iva.get().strip())
+
+        precio_venta_sin_iva = costo_usd / cantidad
+        precio_unitario_usd = costo_usd / cantidad
+        precio_unitario_bs = precio_unitario_usd * tasa
+        precio_total_bs = costo_usd * tasa
+        precio_venta_con_iva_usd = precio_venta_sin_iva * (1 + iva / 100)
+        precio_venta_con_iva_bs = precio_venta_con_iva_usd * tasa
+
+        entry_precio_venta_sin_iva.delete(0, 'end')
+        entry_precio_venta_sin_iva.insert(0, f"{precio_venta_sin_iva:.2f}")
+
+        label_precio_bs.configure(text=f"{precio_total_bs:.2f} Bs")
+        label_precio_bs_und.configure(text=f"{precio_unitario_bs:.2f} Bs")
+        label_precio_venta_con_iva_usd.configure(text=f"{precio_venta_con_iva_usd:.2f} USD")
+        label_precio_venta_con_iva_bs.configure(text=f"{precio_venta_con_iva_bs:.2f} Bs")
+    except ValueError:
+        pass
+
+def limpiar_formulario():
+    entry_nombre.delete(0, 'end')
+    entry_cantidad.delete(0, 'end')
+    entry_costo_usd.delete(0, 'end')
+    entry_unidad.delete(0, 'end')
+    entry_precio_venta_sin_iva.delete(0, 'end')
+    entry_iva.delete(0, 'end')
+    label_precio_bs.configure(text="")
+    label_precio_bs_und.configure(text="")
+    label_precio_venta_con_iva_usd.configure(text="")
+    label_precio_venta_con_iva_bs.configure(text="")
+
+    # Volver a vincular los eventos de entrada a la función calcular_precios
+    entry_cantidad.bind("<KeyRelease>", calcular_precios)
+    entry_costo_usd.bind("<KeyRelease>", calcular_precios)
+    entry_precio_venta_sin_iva.bind("<KeyRelease>", calcular_precios)
+    entry_iva.bind("<KeyRelease>", calcular_precios)
+
+def validar_agregar():
+    try:
+        nombre = entry_nombre.get().strip()
+        cantidad = int(entry_cantidad.get().strip())
+        costo_usd = float(entry_costo_usd.get().strip())
+        unidad = entry_unidad.get().strip()
+        precio_venta_sin_iva = float(entry_precio_venta_sin_iva.get().strip())
+        iva = float(entry_iva.get().strip())
+
+        if not nombre or not unidad:
+            raise ValueError("El nombre y la unidad no pueden estar vacíos.")
+
+        agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path, unidad, precio_venta_sin_iva, iva)
+        cargar_productos(tree)  # Recargar productos en la tabla
+        messagebox.showinfo("Éxito", "Producto agregado correctamente.")
+        limpiar_formulario()  # Limpiar el formulario después de agregar el producto
+    except ValueError as e:
+        messagebox.showerror("Error", f"Datos inválidos: {e}")
+
+def validar_editar():
+    try:
+        nombre = entry_nombre.get().strip()
+        cantidad = int(entry_cantidad.get().strip())
+        costo_usd = float(entry_costo_usd.get().strip())
+        unidad = entry_unidad.get().strip()
+        precio_venta_sin_iva = float(entry_precio_venta_sin_iva.get().strip())
+        iva = float(entry_iva.get().strip())
+
+        if not nombre or not unidad:
+            raise ValueError("El nombre y la unidad no pueden estar vacíos.")
+
+        selected_item = tree.selection()
+        if selected_item:
+            item = tree.item(selected_item)
+            id_producto = item['values'][0]
+            editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path, unidad, precio_venta_sin_iva, iva)
+            cargar_productos(tree)  # Recargar productos en la tabla
+            messagebox.showinfo("Éxito", "Producto editado correctamente.")
+    except ValueError as e:
+        messagebox.showerror("Error", f"Datos inválidos: {e}")
+
+def validar_eliminar():
+    selected_item = tree.selection()
+    if selected_item:
+        item = tree.item(selected_item)
+        id_producto = item['values'][0]
+        eliminar_producto(id_producto, tree)
+        cargar_productos(tree)  # Recargar productos en la tabla
+
+def on_tree_select(event):
+    selected_item = tree.selection()
+    if selected_item:
+        item = tree.item(selected_item)
+        id_producto = item['values'][0]
+        mostrar_ficha_producto(id_producto, root, label_imagen, label_nombre, label_precio_usd, label_precio_bs, label_inventario, label_unidad, label_precio_venta_sin_iva, label_iva, label_precio_venta_con_iva, label_precio_bs_und, label_precio_venta_con_iva_bs)
+
 def interfaz_inventario():
     """Interfaz mejorada para la gestión de inventario."""
 
-    global entry_nombre, entry_cantidad, entry_costo_usd, entry_unidad, tasa, imagen_path, tree, entry_precio_venta_sin_iva, entry_iva, label_precio_bs, label_precio_venta_con_iva_usd, label_precio_venta_con_iva_bs, label_precio_bs_und
+    global entry_nombre, entry_cantidad, entry_costo_usd, entry_unidad, tasa, imagen_path, tree, entry_precio_venta_sin_iva, entry_iva, label_precio_bs, label_precio_venta_con_iva_usd, label_precio_venta_con_iva_bs, label_precio_bs_und, frame_main, root, label_imagen, label_nombre, label_precio_usd, label_precio_bs, label_inventario, label_unidad, label_precio_venta_sin_iva, label_iva, label_precio_venta_con_iva
 
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
@@ -222,7 +352,7 @@ def interfaz_inventario():
 
     # Establecer el icono del programa
     icon_path = os.path.join(os.path.dirname(__file__), 'icono.png')
-    icon_image = PhotoImage(file=icon_path)
+    icon_image = ImageTk.PhotoImage(file=icon_path)
     root.iconphoto(True, icon_image)  # Asegúrate de que el archivo icono.png esté en el mismo directorio
 
     # Configurar el grid
@@ -264,47 +394,29 @@ def interfaz_inventario():
     frame_input = ctk.CTkFrame(frame_main)
     frame_input.grid(row=2, column=1, columnspan=3, pady=10, padx=20, sticky="ew")
 
-    ctk.CTkLabel(frame_input, text="Nombre:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-    entry_nombre = ctk.CTkEntry(frame_input, width=150)
-    entry_nombre.grid(row=0, column=1, padx=5, pady=5)
-
-    ctk.CTkLabel(frame_input, text="Cantidad:").grid(row=0, column=2, padx=5, pady=5, sticky="e")
-    entry_cantidad = ctk.CTkEntry(frame_input, width=80)
-    entry_cantidad.grid(row=0, column=3, padx=5, pady=5)
-
-    ctk.CTkLabel(frame_input, text="Costo (USD):").grid(row=1, column=0, padx=5, pady=5, sticky="e")
-    entry_costo_usd = ctk.CTkEntry(frame_input, width=80)
-    entry_costo_usd.grid(row=1, column=1, padx=5, pady=5)
-
-    ctk.CTkLabel(frame_input, text="Unidad:").grid(row=1, column=2, padx=5, pady=5, sticky="e")
-    entry_unidad = ctk.CTkEntry(frame_input, width=80)
-    entry_unidad.grid(row=1, column=3, padx=5, pady=5)
-
-    ctk.CTkLabel(frame_input, text="Precio Venta Sin IVA (USD):").grid(row=2, column=0, padx=5, pady=5, sticky="e")
-    entry_precio_venta_sin_iva = ctk.CTkEntry(frame_input, width=80)
-    entry_precio_venta_sin_iva.grid(row=2, column=1, padx=5, pady=5)
-
-    ctk.CTkLabel(frame_input, text="IVA (%):").grid(row=2, column=2, padx=5, pady=5, sticky="e")
-    entry_iva = ctk.CTkEntry(frame_input, width=80)
-    entry_iva.grid(row=2, column=3, padx=5, pady=5)
+    entry_nombre = crear_entry(frame_input, 150, 0, 1)
+    crear_label(frame_input, "Nombre:", 0, 0)
+    entry_cantidad = crear_entry(frame_input, 80, 0, 3)
+    crear_label(frame_input, "Cantidad:", 0, 2)
+    entry_costo_usd = crear_entry(frame_input, 80, 1, 1)
+    crear_label(frame_input, "Costo (USD):", 1, 0)
+    entry_unidad = crear_entry(frame_input, 80, 1, 3)
+    crear_label(frame_input, "Unidad:", 1, 2)
+    entry_precio_venta_sin_iva = crear_entry(frame_input, 80, 2, 1)
+    crear_label(frame_input, "Precio Venta Sin IVA (USD):", 2, 0)
+    entry_iva = crear_entry(frame_input, 80, 2, 3)
+    crear_label(frame_input, "IVA (%):", 2, 2)
     entry_iva.insert(0, "16")  # Valor por defecto del IVA
 
     # Campos para mostrar los precios calculados
-    ctk.CTkLabel(frame_input, text="Precio Sin IVA (Bs):").grid(row=3, column=0, padx=5, pady=5, sticky="e")
-    label_precio_bs = ctk.CTkLabel(frame_input, text="")
-    label_precio_bs.grid(row=3, column=1, padx=5, pady=5, sticky="w")
-
-    ctk.CTkLabel(frame_input, text="Precio Unitario (Bs):").grid(row=3, column=2, padx=5, pady=5, sticky="e")
-    label_precio_bs_und = ctk.CTkLabel(frame_input, text="")
-    label_precio_bs_und.grid(row=3, column=3, padx=5, pady=5, sticky="w")
-
-    ctk.CTkLabel(frame_input, text="Precio Venta Con IVA (USD):").grid(row=4, column=0, padx=5, pady=5, sticky="e")
-    label_precio_venta_con_iva_usd = ctk.CTkLabel(frame_input, text="")
-    label_precio_venta_con_iva_usd.grid(row=4, column=1, padx=5, pady=5, sticky="w")
-
-    ctk.CTkLabel(frame_input, text="Precio Venta Con IVA (Bs):").grid(row=4, column=2, padx=5, pady=5, sticky="e")
-    label_precio_venta_con_iva_bs = ctk.CTkLabel(frame_input, text="")
-    label_precio_venta_con_iva_bs.grid(row=4, column=3, padx=5, pady=5, sticky="w")
+    label_precio_bs = crear_label(frame_input, "", 3, 1, sticky="w")
+    crear_label(frame_input, "Precio (Bs):", 3, 0)
+    label_precio_bs_und = crear_label(frame_input, "", 3, 3, sticky="w")
+    crear_label(frame_input, "Precio Unitario (Bs):", 3, 2)
+    label_precio_venta_con_iva_usd = crear_label(frame_input, "", 4, 1, sticky="w")
+    crear_label(frame_input, "Precio Venta Con IVA (USD):", 4, 0)
+    label_precio_venta_con_iva_bs = crear_label(frame_input, "", 4, 3, sticky="w")
+    crear_label(frame_input, "Precio Venta Con IVA (Bs):", 4, 2)
 
     # Botón para seleccionar imagen
     imagen_path = None
@@ -321,27 +433,6 @@ def interfaz_inventario():
     if not tasa:
         messagebox.showerror("Error", "No se pudo obtener la tasa de cambio.")
         return
-
-    # Función para calcular precios automáticamente
-    def calcular_precios(event=None):
-        try:
-            cantidad = int(entry_cantidad.get().strip())
-            costo_usd = float(entry_costo_usd.get().strip())
-            precio_venta_sin_iva = float(entry_precio_venta_sin_iva.get().strip())
-            iva = float(entry_iva.get().strip())
-
-            precio_unitario_usd = costo_usd / cantidad
-            precio_unitario_bs = precio_unitario_usd * tasa
-            precio_total_bs = costo_usd * tasa
-            precio_venta_con_iva_usd = precio_venta_sin_iva * (1 + iva / 100)
-            precio_venta_con_iva_bs = precio_venta_con_iva_usd * tasa
-
-            label_precio_bs.configure(text=f"{precio_total_bs:.2f} Bs")
-            label_precio_bs_und.configure(text=f"{precio_unitario_bs:.2f} Bs")
-            label_precio_venta_con_iva_usd.configure(text=f"{precio_venta_con_iva_usd:.2f} USD")
-            label_precio_venta_con_iva_bs.configure(text=f"{precio_venta_con_iva_bs:.2f} Bs")
-        except ValueError:
-            pass
 
     # Vincular la función de cálculo a los eventos de entrada
     entry_cantidad.bind("<KeyRelease>", calcular_precios)
@@ -386,86 +477,12 @@ def interfaz_inventario():
     label_precio_venta_con_iva_bs = ctk.CTkLabel(frame_detalles, text="Precio Venta Con IVA (Bs): ")
     label_precio_venta_con_iva_bs.pack(pady=5)
 
-    # Función para limpiar el formulario
-    def limpiar_formulario():
-        entry_nombre.delete(0, 'end')
-        entry_cantidad.delete(0, 'end')
-        entry_costo_usd.delete(0, 'end')
-        entry_unidad.delete(0, 'end')
-        entry_precio_venta_sin_iva.delete(0, 'end')
-        entry_iva.delete(0, 'end')
-        label_precio_bs.configure(text="")
-        label_precio_bs_und.configure(text="")
-        label_precio_venta_con_iva_usd.configure(text="")
-        label_precio_venta_con_iva_bs.configure(text="")
-
-    # Función para validar y agregar producto
-    def validar_agregar():
-        try:
-            nombre = entry_nombre.get().strip()
-            cantidad = int(entry_cantidad.get().strip())
-            costo_usd = float(entry_costo_usd.get().strip())
-            unidad = entry_unidad.get().strip()
-            precio_venta_sin_iva = float(entry_precio_venta_sin_iva.get().strip())
-            iva = float(entry_iva.get().strip())
-
-            if not nombre or not unidad:
-                raise ValueError("El nombre y la unidad no pueden estar vacíos.")
-
-            agregar_producto(nombre, cantidad, costo_usd, tasa, imagen_path, unidad, precio_venta_sin_iva, iva)
-            cargar_productos(tree)  # Recargar productos en la tabla
-            messagebox.showinfo("Éxito", "Producto agregado correctamente.")
-            limpiar_formulario()  # Limpiar el formulario después de agregar el producto
-        except ValueError as e:
-            messagebox.showerror("Error", f"Datos inválidos: {e}")
-
-    # Botón para agregar producto
-    ctk.CTkButton(frame_main, text="Agregar Producto", command=validar_agregar).grid(row=3, column=1, pady=10, sticky="ew")
-
-    # Botón para editar producto (se requiere un ID válido)
-    def validar_editar():
-        try:
-            nombre = entry_nombre.get().strip()
-            cantidad = int(entry_cantidad.get().strip())
-            costo_usd = float(entry_costo_usd.get().strip())
-            unidad = entry_unidad.get().strip()
-            precio_venta_sin_iva = float(entry_precio_venta_sin_iva.get().strip())
-            iva = float(entry_iva.get().strip())
-
-            if not nombre or not unidad:
-                raise ValueError("El nombre y la unidad no pueden estar vacíos.")
-
-            selected_item = tree.selection()
-            if selected_item:
-                item = tree.item(selected_item)
-                id_producto = item['values'][0]
-                editar_producto(id_producto, nombre, cantidad, costo_usd, tasa, imagen_path, unidad, precio_venta_sin_iva, iva)
-                cargar_productos(tree)  # Recargar productos en la tabla
-                messagebox.showinfo("Éxito", "Producto editado correctamente.")
-        except ValueError as e:
-            messagebox.showerror("Error", f"Datos inválidos: {e}")
-
+    # Botones para agregar, editar y eliminar productos
+    ctk.CTkButton(frame_main, text="Agregar Producto", command=validar_agregar).grid(row=3, column=1, columnspan=1, pady=10, sticky="ew")
     ctk.CTkButton(frame_main, text="Editar Producto", command=validar_editar).grid(row=3, column=2, columnspan=1, pady=10, sticky="ew")
-
-    # Botón para eliminar producto (se requiere un ID válido)
-    def validar_eliminar():
-        selected_item = tree.selection()
-        if selected_item:
-            item = tree.item(selected_item)
-            id_producto = item['values'][0]
-            eliminar_producto(id_producto, tree)
-            cargar_productos(tree)  # Recargar productos en la tabla
-
     ctk.CTkButton(frame_main, text="Eliminar Producto", command=validar_eliminar).grid(row=3, column=3, columnspan=1, pady=10, sticky="ew")
 
     # Evento para seleccionar producto en la tabla
-    def on_tree_select(event):
-        selected_item = tree.selection()
-        if selected_item:
-            item = tree.item(selected_item)
-            id_producto = item['values'][0]
-            mostrar_ficha_producto(id_producto, root, label_imagen, label_nombre, label_precio_usd, label_precio_bs, label_inventario, label_unidad, label_precio_venta_sin_iva, label_iva, label_precio_venta_con_iva, label_precio_bs_und, label_precio_venta_con_iva_bs)
-
     tree.bind("<<TreeviewSelect>>", on_tree_select)
 
     root.mainloop()
