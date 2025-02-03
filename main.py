@@ -50,11 +50,12 @@ currency_menu.add_command(label="Tasa de Cambio", command=open_tasa_cambio)
 # Función para redimensionar la imagen de fondo
 def resize_image(event):
     new_width = event.width
-    new_height = event.height
-    image = background_image.resize((new_width, new_height))
-    background_photo = ImageTk.PhotoImage(image)
-    background_label.config(image=background_photo)
-    background_label.image = background_photo
+    new_height = event.height - 40  # Ajustar para la barra de menú y la barra de derechos de autor
+    if new_width > 0 and new_height > 0:
+        image = background_image.resize((new_width, new_height))
+        background_photo = ImageTk.PhotoImage(image)
+        background_label.config(image=background_photo)
+        background_label.image = background_photo
 
 # Cargar la imagen de fondo
 background_image = Image.open("Fondo.png")
@@ -66,6 +67,12 @@ background_label.place(relwidth=1, relheight=1)
 
 # Vincular el evento de redimensionamiento de la ventana a la función de redimensionamiento de la imagen
 root.bind('<Configure>', resize_image)
+
+# Crear una barra de derechos de autor
+copyright_frame = ttk.Frame(root, padding="5 5 5 5", style="TFrame")
+copyright_frame.place(relwidth=1, rely=1.0, anchor='sw')
+copyright_label = ttk.Label(copyright_frame, text="© 2025 leoagv21. Todos los derechos reservados. Diseñado por Leonardo González.", style="TLabel")
+copyright_label.pack(fill='x')
 
 # Ejecutar la aplicación
 root.mainloop()
