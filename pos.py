@@ -75,9 +75,10 @@ def generar_factura(nombre_cliente, cedula_rif, total_bs, total_divisas, iva_tot
     total_height = base_height + product_height + 100  # Altura adicional para totales y otros datos
 
     # Crear el canvas con una altura inicial
-    factura_path = os.path.join(os.path.dirname(__file__), f"factura_{cedula_rif}.pdf")
-    c = canvas.Canvas(factura_path, pagesize=(57 * mm, total_height * mm))
-    width, height = 57 * mm, total_height * mm
+    os.makedirs("fac", exist_ok=True)  # Crear la carpeta 'fac' si no existe
+    factura_path = os.path.join("fac", f"factura_{cedula_rif}.pdf")
+    c = canvas.Canvas(factura_path, pagesize=(60 * mm, total_height * mm))
+    width, height = 60 * mm, total_height * mm
 
     # Membrete y logo
     c.setFont("Courier-Bold", 8)
@@ -254,9 +255,25 @@ def interfaz_pos():
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
 
+    # ...existing code...
+
     root = ctk.CTk()
-    root.title("Punto de Venta")
+    root.title("POS")
     root.state('zoomed')  # Maximizar la ventana al iniciar
+
+    # Cambiar el icono de la ventana
+    icon_path = os.path.join(os.path.dirname(__file__), 'icono.ico')  # Cambia 'nuevo_icono.ico' por el nombre de tu nuevo icono
+    root.iconbitmap(icon_path)
+
+    # Cargar el logo
+    logo_path = os.path.join(os.path.dirname(__file__), 'icono.png')  # Cambia 'nuevo_logo.png' por el nombre de tu nuevo logo
+    logo_image = Image.open(logo_path)
+    logo_ctk_image = ctk.CTkImage(logo_image)
+
+    # Mostrar el logo en la interfaz
+    logo_label = ctk.CTkLabel(root, image=logo_ctk_image)
+    logo_label.grid(row=0, column=0, padx=10, pady=10)
+    
 
     # Establecer el icono del programa
     icon_path = os.path.join(os.path.dirname(__file__), 'icono.png')
