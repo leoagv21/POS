@@ -350,14 +350,18 @@ def interfaz_inventario():
     root.title("Gestión de Inventario")
     root.state('zoomed')  # Maximizar la ventana al iniciar
 
+    # Cambiar el icono de la ventana
+    icon_path = os.path.join(os.path.dirname(__file__), 'icono.ico')  # Cambia 'nuevo_icono.ico' por el nombre de tu nuevo icono
+    root.iconbitmap(icon_path)
+
     # Establecer el icono del programa
     icon_path = os.path.join(os.path.dirname(__file__), 'icono.png')
     icon_image = ImageTk.PhotoImage(file=icon_path)
     root.iconphoto(True, icon_image)  # Asegúrate de que el archivo icono.png esté en el mismo directorio
 
     # Configurar el grid
-    root.grid_rowconfigure(1, weight=1)
-    root.grid_columnconfigure(1, weight=1)
+    root.grid_rowconfigure(0, weight=1)
+    root.grid_columnconfigure(0, weight=1)
 
     # Contenedor principal
     frame_main = ctk.CTkFrame(root)
@@ -370,7 +374,7 @@ def interfaz_inventario():
 
     # Frame para lista de productos
     frame_lista = ctk.CTkFrame(frame_main)
-    frame_lista.grid(row=1, column=1, columnspan=3, pady=10, sticky="nsew")
+    frame_lista.grid(row=1, column=0, columnspan=4, pady=10, sticky="nsew")
     frame_lista.grid_rowconfigure(0, weight=1)
     frame_lista.grid_columnconfigure(0, weight=1)
 
@@ -392,7 +396,7 @@ def interfaz_inventario():
 
     # Frame de entrada
     frame_input = ctk.CTkFrame(frame_main)
-    frame_input.grid(row=2, column=1, columnspan=3, pady=10, padx=20, sticky="ew")
+    frame_input.grid(row=2, column=0, columnspan=4, pady=10, padx=20, sticky="ew")
 
     entry_nombre = crear_entry(frame_input, 150, 0, 1)
     crear_label(frame_input, "Nombre:", 0, 0)
@@ -442,7 +446,7 @@ def interfaz_inventario():
 
     # Frame para mostrar detalles del producto
     frame_detalles = ctk.CTkFrame(frame_main)
-    frame_detalles.grid(row=1, column=0, rowspan=2, padx=10, pady=10, sticky="n")
+    frame_detalles.grid(row=1, column=4, rowspan=2, padx=10, pady=10, sticky="n")
 
     label_imagen = ctk.CTkLabel(frame_detalles, text="No hay imagen", width=100, height=100)
     label_imagen.pack(pady=10)

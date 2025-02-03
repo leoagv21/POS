@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from db_manager import get_connection
+import os
+from PIL import Image, ImageTk
 
 def obtener_tasas():
     """Obtiene todas las tasas de cambio de la base de datos."""
@@ -58,42 +60,53 @@ def interfaz_tasa_cambio():
 
     root = ctk.CTk()
     root.title("Gestionar Tasa de Cambio")
-    root.geometry("700x500")
+    root.geometry("800x600")
+
+    # Cambiar el icono de la ventana
+    icon_path = os.path.join(os.path.dirname(__file__), 'icono.ico')  # Cambia 'nuevo_icono.ico' por el nombre de tu nuevo icono
+    root.iconbitmap(icon_path)
 
     # Título principal
-    ctk.CTkLabel(root, text="Gestión de Tasa de Cambio", font=("Arial", 20, "bold")).pack(pady=10)
+    ctk.CTkLabel(root, text="Gestión de Tasa de Cambio", font=("Arial", 24, "bold")).grid(row=1, column=0, columnspan=2, pady=20)
 
     # Entrada para la tasa actual
     frame_input = ctk.CTkFrame(root)
-    frame_input.pack(pady=10, padx=20, fill="x")
+    frame_input.grid(row=2, column=0, columnspan=2, pady=10, padx=20, sticky="ew")
 
-    ctk.CTkLabel(frame_input, text="Tasa de Cambio Actual (Bs/USD):").pack(side="left", padx=10)
-    entry_tasa = ctk.CTkEntry(frame_input, placeholder_text="Introduce la tasa actual")
-    entry_tasa.pack(side="left", padx=10, fill="x", expand=True)
+    ctk.CTkLabel(frame_input, text="Tasa de Cambio Actual (Bs/USD):", font=("Arial", 14)).grid(row=0, column=0, padx=10)
+    entry_tasa = ctk.CTkEntry(frame_input, placeholder_text="Introduce la tasa actual", font=("Arial", 14))
+    entry_tasa.grid(row=0, column=1, padx=10, sticky="ew")
 
     # Botón para actualizar la tasa
     ctk.CTkButton(
         root,
         text="Actualizar Tasa",
-        command=lambda: actualizar_tasa_cambio(entry_tasa.get(), combo_tasas)
-    ).pack(pady=10)
+        command=lambda: actualizar_tasa_cambio(entry_tasa.get(), combo_tasas),
+        font=("Arial", 14)
+    ).grid(row=3, column=0, columnspan=2, pady=20)
 
     # Título para la lista de tasas
-    ctk.CTkLabel(root, text="Tasas de Cambio Anteriores:", font=("Arial", 14)).pack(pady=10)
+    ctk.CTkLabel(root, text="Tasas de Cambio Anteriores:", font=("Arial", 18)).grid(row=4, column=0, columnspan=2, pady=10)
 
     # ComboBox para mostrar y seleccionar tasas
     frame_lista = ctk.CTkFrame(root)
-    frame_lista.pack(pady=10, padx=20, fill="both", expand=True)
+    frame_lista.grid(row=5, column=0, columnspan=2, pady=10, padx=20, sticky="nsew")
 
-    combo_tasas = ctk.CTkComboBox(frame_lista, width=300, font=("Arial", 12))
-    combo_tasas.pack(side="left", padx=10, pady=10, fill="x", expand=True)
+    combo_tasas = ctk.CTkComboBox(frame_lista, width=400, font=("Arial", 14))
+    combo_tasas.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
     # Botón para seleccionar una tasa
     ctk.CTkButton(
         root,
         text="Seleccionar Tasa",
-        command=lambda: seleccionar_tasa(combo_tasas, entry_tasa)
-    ).pack(pady=10)
+        command=lambda: seleccionar_tasa(combo_tasas, entry_tasa),
+        font=("Arial", 14)
+    ).grid(row=6, column=0, columnspan=2, pady=20)
+
+    # Ajustar el tamaño de las columnas
+    root.grid_columnconfigure(0, weight=1)
+    root.grid_columnconfigure(1, weight=1)
+    root.grid_rowconfigure(5, weight=1)
 
     # Cargar la lista inicial de tasas
     refrescar_lista(combo_tasas)
